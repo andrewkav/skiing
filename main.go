@@ -104,7 +104,7 @@ func sourcesAndEdges(N, M int, A [][]int) (sources []int, E []edge) {
 				down = A[i+1][j]
 			}
 
-			if aij > left && aij > right && aij > up && aij > down {
+			if aij >= left && aij >= right && aij >= up && aij >= down {
 				sources = append(sources, v)
 			}
 		}
@@ -113,18 +113,70 @@ func sourcesAndEdges(N, M int, A [][]int) (sources []int, E []edge) {
 	return
 }
 
-func process(N, M int, A [][]int, E []edge, S []int) (maxPathLen, drop int) {
+func process(N, M int, A [][]int, S []int) (maxPathLen, drop int) {
 
 	var (
 		NN        = N * M
 		d         = make([]int, NN)
 		globalMin = inf
+		q         = make([]int, NN)
+		visited   = make([]bool, NN)
 	)
 
 	for count, s := range S {
+
 		if count%100 == 0 {
 			log.Println("processing ", count)
 		}
+
+		for i := 0; i < NN; i++ {
+			visited[i] = false
+		}
+		var GE []edge
+
+		head := 1
+		tail := 0
+		q[0] = s
+		for head > tail {
+			hv := q[tail]
+			tail++
+			i := hv / M
+			j := hv % M
+			aij := A[i][j]
+
+			if j+1 < M && aij > A[i][j+1] {
+				GE = append(GE, edge{hv, hv + 1})
+				if !visited[hv+1] {
+					q[head] = hv + 1
+					head++
+				}
+			}
+			// right
+			if j-1 > -1 && aij > A[i][j-1] {
+				GE = append(GE, edge{hv, hv - 1})
+				if !visited[hv-1] {
+					q[head] = hv - 1
+					head++
+				}
+			}
+			// up
+			if i+1 < N && aij > A[i+1][j] {
+				GE = append(GE, edge{U: hv, V: hv + M})
+				if !visited[hv+M] {
+					q[head] = hv + M
+					head++
+				}
+			}
+			// down
+			if i-1 > -1 && aij > A[i-1][j] {
+				GE = append(GE, edge{U: hv, V: hv - M})
+				if !visited[hv-M] {
+					q[head] = hv - M
+					head++
+				}
+			}
+		}
+
 		for i := 0; i < NN; i++ {
 			d[i] = inf
 		}
@@ -138,12 +190,12 @@ func process(N, M int, A [][]int, E []edge, S []int) (maxPathLen, drop int) {
 
 		as = A[s/M][s%M]
 
-		lenE = len(E)
+		lenE = len(GE)
 		for i := 0; i < NN-1; i++ {
 			relaxed = false
 			for j := 0; j < lenE; j++ {
-				du = d[E[j].U]
-				v = E[j].V
+				du = d[GE[j].U]
+				v = GE[j].V
 				dv = d[v]
 				if du != inf && dv > du-1 {
 					d[v] = du - 1
@@ -177,10 +229,11 @@ func process(N, M int, A [][]int, E []edge, S []int) (maxPathLen, drop int) {
 func main() {
 	N, M, A := read("map1.txt")
 
-	S, E := sourcesAndEdges(N, M, A)
+	S, _ := sourcesAndEdges(N, M, A)
 
 	startedAt := time.Now()
 
+	//S = S[0:10000]
 	splitNum := runtime.NumCPU()
 	splitLen := len(S) / splitNum
 	if splitLen == 0 {
@@ -201,7 +254,7 @@ func main() {
 			if right >= len(S) {
 				right = len(S)
 			}
-			pathLen, drop := process(N, M, A, E, S[idx*splitLen:right])
+			pathLen, drop := process(N, M, A, S[idx*splitLen:right])
 			globalResult[idx] = result{
 				drop:    drop,
 				pathLen: pathLen,
