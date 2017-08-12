@@ -113,13 +113,12 @@ func sourcesAndEdges(N, M int, A [][]int) (sources []int, E []edge) {
 	return
 }
 
-func process(N, M int, E []edge, S []int) (maxPathLen, resV int) {
+func process(N, M int, A [][]int, E []edge, S []int) (maxPathLen, drop int) {
 
 	var (
 		NN        = N * M
 		d         = make([]int, NN)
 		globalMin = inf
-		drop      = -1
 	)
 
 	for count, s := range S {
@@ -133,16 +132,18 @@ func process(N, M int, E []edge, S []int) (maxPathLen, resV int) {
 		d[s] = 0
 
 		localMin := inf
+		localDrop := 0
 		var relaxed = false
-		var du, dv, v, lenE int
+		var as, du, dv, v, lenE int
+
+		as = A[s/M][s%M]
 
 		lenE = len(E)
 		for i := 0; i < NN-1; i++ {
 			relaxed = false
-
 			for j := 0; j < lenE; j++ {
-				v = E[j].V
 				du = d[E[j].U]
+				v = E[j].V
 				dv = d[v]
 				if du != inf && dv > du-1 {
 					d[v] = du - 1
@@ -154,15 +155,17 @@ func process(N, M int, E []edge, S []int) (maxPathLen, resV int) {
 			}
 
 			for ii := 0; ii < NN; ii++ {
-				if d[ii] < localMin {
+				dr := as - A[ii/M][ii%M]
+				if (d[ii] < localMin) || (d[ii] == localMin && dr > localDrop) {
 					localMin = d[ii]
+					localDrop = dr
 				}
 			}
 		}
 
-		if localMin < globalMin {
+		if (localMin < globalMin) || (localMin == globalMin && drop < localDrop) {
 			globalMin = localMin
-			drop = s
+			drop = localDrop
 		}
 	}
 
@@ -180,6 +183,9 @@ func main() {
 
 	splitNum := runtime.NumCPU()
 	splitLen := len(S) / splitNum
+	if splitLen == 0 {
+		splitLen += 1
+	}
 	type result struct {
 		drop    int
 		pathLen int
@@ -195,7 +201,7 @@ func main() {
 			if right >= len(S) {
 				right = len(S)
 			}
-			pathLen, drop := process(N, M, E, S[idx*splitLen:right])
+			pathLen, drop := process(N, M, A, E, S[idx*splitLen:right])
 			globalResult[idx] = result{
 				drop:    drop,
 				pathLen: pathLen,
@@ -209,7 +215,7 @@ func main() {
 	maxPathLen := 0
 	drop := -1
 	for _, r := range globalResult {
-		if r.pathLen > maxPathLen {
+		if r.pathLen > maxPathLen || (r.pathLen == maxPathLen && drop < r.drop) {
 			drop = r.drop
 			maxPathLen = r.pathLen
 		}
@@ -217,5 +223,5 @@ func main() {
 
 	log.Println("--------------------------------------")
 	log.Printf("Elapsed time: %.2f sec", time.Now().Sub(startedAt).Seconds())
-	log.Printf("Drop: %d, Path length: %d", A[drop/M][drop%M], maxPathLen)
+	log.Printf("Path length: %d, Drop: %d", maxPathLen, drop)
 }
